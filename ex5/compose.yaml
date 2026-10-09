@@ -1,0 +1,31 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-ex5
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: exercice5
+      MYSQL_USER: user5
+      MYSQL_PASSWORD: pass123
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - reseau-ex5
+
+  adminer:
+    image: adminer
+    container_name: adminer-ex5
+    restart: always
+    ports:
+      - "8082:8080"
+    networks:
+      - reseau-ex5
+    depends_on:
+      - mysql
+
+volumes:
+  mysql-data:
+
+networks:
+  reseau-ex5:
