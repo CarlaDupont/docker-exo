@@ -1,15 +1,12 @@
 # Exercice 10 — Docker Compose : variables d'environnement et volumes
 
-Application Spring Boot de notes + PostgreSQL.
+Application de notes en Spring Boot avec PostgreSQL. J'ai ajouté le `.env`, le `docker-compose.yml` et le `Dockerfile`.
 
-Fichiers ajoutés :
-- [.env](.env) : variables d'environnement
-- [docker-compose.yml](docker-compose.yml) : services `app` et `db`, volumes `pg_data` et `uploads`
-- [Dockerfile](Dockerfile) : image de l'application
+Le port 8080 étant déjà pris, l'application est sur le 8087 (`APP_PORT` dans le `.env`).
 
-Port 8080 occupé, l'application est sur le 8087 (`APP_PORT` dans le `.env`).
+Les commandes `curl` sont à lancer dans Git Bash, dans PowerShell `curl` ne marche pas pareil.
 
-Commandes `curl` à lancer dans Git Bash (dans PowerShell, `curl` est un alias d'`Invoke-WebRequest`).
+Il n'y a pas de page d'accueil, il faut aller sur http://localhost:8087/api/notes.
 
 ## Test 1 : Démarrage
 ```bash

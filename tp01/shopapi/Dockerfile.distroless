@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:20.18.0-alpine3.20 AS base
+WORKDIR /app
+
+# dépendances de prod seulement, rejouées uniquement si package*.json change
+FROM base AS deps
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --ignore-scripts
+
+# tests et lint avec les dépendances de dev
+FROM base AS test
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts
+COPY src ./src
+COPY test ./test
+RUN npm test && npm run lint
+
+# variante distroless : pas de shell ni de gestionnaire de paquets
+FROM gcr.io/distroless/nodejs20-debian12:nonroot@sha256:2cd820156cf039c8b54ae2d2a97e424b6729070714de8707a6b79f20d56f6a9a AS runtime
+WORKDIR /app
+
+ARG APP_VERSION=0.0.0
+ARG GIT_SHA=unknown
+ARG SOURCE_URL=https://github.com/shop-sas/shopapi
+LABEL org.opencontainers.image.title="shopapi" \
+      org.opencontainers.image.description="API catalogue produits (distroless)" \
+      org.opencontainers.image.version="${APP_VERSION}" \
+      org.opencontainers.image.revision="${GIT_SHA}" \
+      org.opencontainers.image.source="${SOURCE_URL}" \
+      org.opencontainers.image.vendor="Shop SAS"
+ENV NODE_ENV=production \
+    APP_VERSION=${APP_VERSION}
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json ./
+COPY --from=test /app/src ./src
+
+EXPOSE 3000
+# pas de wget ni de shell : le healthcheck passe par node
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+  CMD ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+# l'entrypoint de l'image est déjà node
+CMD ["src/server.js"]

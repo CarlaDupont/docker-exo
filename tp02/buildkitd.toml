@@ -1,0 +1,4 @@
+# registre local du TP en HTTP
+[registry."localhost:5000"]
+  http = true
+  insecure = true

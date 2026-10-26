@@ -1,0 +1,16 @@
+# pull-through cache de Docker Hub
+version: 0.1
+log:
+  level: info
+  fields:
+    service: mirror
+storage:
+  filesystem:
+    rootdirectory: /var/lib/registry
+  delete:
+    enabled: true
+http:
+  addr: :5000
+proxy:
+  remoteurl: https://registry-1.docker.io
+  ttl: 168h

@@ -1,0 +1,84 @@
+name: shop-registry
+
+services:
+  registry:
+    image: registry:2.8.3
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - registry-data:/var/lib/registry
+      - ./config.yml:/etc/docker/registry/config.yml:ro
+      - ./certs:/certs:ro
+      - ./auth:/auth:ro
+    networks:
+      regnet:
+        aliases:
+          - registry.local
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--no-check-certificate", "-O", "/dev/null", "https://localhost:5000/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # pull-through cache Docker Hub
+  mirror:
+    image: registry:2.8.3
+    restart: unless-stopped
+    ports:
+      - "5001:5000"
+    volumes:
+      - mirror-data:/var/lib/registry
+      - ./mirror.yml:/etc/docker/registry/config.yml:ro
+    networks:
+      - regnet
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:5000/v2/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  ui:
+    image: joxit/docker-registry-ui:2.5.7
+    restart: unless-stopped
+    ports:
+      - "8091:80"
+    environment:
+      REGISTRY_TITLE: Shop SAS
+      SINGLE_REGISTRY: "true"
+      NGINX_PROXY_PASS_URL: https://registry.local:5000
+      DELETE_IMAGES: "true"
+      SHOW_CONTENT_DIGEST: "true"
+      REGISTRY_SECURED: "true"
+    networks:
+      - regnet
+    depends_on:
+      registry:
+        condition: service_healthy
+
+  # machine cliente de test : son propre daemon Docker, avec la CA, le mirror et registry.local
+  client:
+    image: docker:27.3.1-dind
+    profiles: ["client"]
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      - type: bind
+        source: ./certs/ca.crt
+        target: /etc/docker/certs.d/registry.local:5000/ca.crt
+        read_only: true
+      - type: bind
+        source: ../client/daemon.json
+        target: /etc/docker/daemon.json
+        read_only: true
+    networks:
+      - regnet
+
+networks:
+  regnet:
+    name: regnet
+
+volumes:
+  registry-data:
+  mirror-data:

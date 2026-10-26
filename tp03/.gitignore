@@ -1,0 +1,10 @@
+.env
+registry/certs/*
+!registry/certs/.gitkeep
+registry/auth/htpasswd
+client/config.json
+cosign.key
+*.tar
+sbom*.json
+.gate.*/
+bash.exe.stackdump
