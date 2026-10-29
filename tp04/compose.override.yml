@@ -1,0 +1,30 @@
+services:
+  proxy:
+    environment:
+      TRAEFIK_API_DASHBOARD: "true"
+      TRAEFIK_API_INSECURE: "true"
+    ports:
+      - "8080:8080"
+
+  api:
+    command: ["node", "--watch", "src/server.js"]
+    environment:
+      LOG_LEVEL: debug
+    volumes:
+      - ../tp01/shopapi/src:/app/src
+    ports:
+      - "3000:3000"
+
+  worker:
+    environment:
+      LOG_LEVEL: DEBUG
+
+  db:
+    ports:
+      - "5432:5432"
+
+# un conteneur seul sur un réseau internal ne peut pas publier de port :
+# en dev on lève la restriction pour pouvoir ouvrir la base depuis le poste
+networks:
+  back:
+    internal: false

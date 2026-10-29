@@ -1,0 +1,9 @@
+# PostgreSQL 16 sur un nouveau volume : l'ancien (pgdata, en PG14) n'est jamais modifié
+services:
+  db:
+    image: postgres:16.4-alpine
+    volumes: !override
+      - pgdata16:/var/lib/postgresql/data
+
+volumes:
+  pgdata16:

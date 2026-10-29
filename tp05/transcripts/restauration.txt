@@ -1,0 +1,245 @@
+# stack du TP04 (projet shop), on part d'une base vide
+$ docker compose -f compose.yml down -v
+ Volume shop_redisdata  Removing
+ Volume shop_pgdata  Removing
+ Volume shop_redisdata  Removed
+ Volume shop_pgdata  Removed
+$ docker compose -f compose.yml up -d --wait
+ Network shop_back  Creating
+ Network shop_back  Created
+ Network shop_front  Creating
+ Network shop_front  Created
+ Volume "shop_pgdata"  Creating
+ Volume "shop_pgdata"  Created
+ Volume "shop_redisdata"  Creating
+ Volume "shop_redisdata"  Created
+ Container shop-redis-1  Creating
+ Container shop-db-1  Creating
+ Container shop-proxy-1  Creating
+ Container shop-proxy-1  Created
+ Container shop-redis-1  Created
+ Container shop-db-1  Created
+ Container shop-api-1  Creating
+ Container shop-worker-1  Creating
+ Container shop-worker-1  Created
+ Container shop-api-1  Created
+ Container shop-proxy-1  Starting
+ Container shop-db-1  Starting
+ Container shop-redis-1  Starting
+ Container shop-redis-1  Started
+ Container shop-db-1  Started
+ Container shop-redis-1  Waiting
+ Container shop-db-1  Waiting
+ Container shop-db-1  Waiting
+ Container shop-redis-1  Waiting
+ Container shop-proxy-1  Started
+ Container shop-redis-1  Healthy
+ Container shop-redis-1  Healthy
+ Container shop-db-1  Healthy
+ Container shop-db-1  Healthy
+ Container shop-worker-1  Starting
+ Container shop-api-1  Starting
+ Container shop-worker-1  Started
+ Container shop-api-1  Started
+ Container shop-proxy-1  Waiting
+ Container shop-api-1  Waiting
+ Container shop-worker-1  Waiting
+ Container shop-db-1  Waiting
+ Container shop-redis-1  Waiting
+ Container shop-db-1  Healthy
+ Container shop-redis-1  Healthy
+ Container shop-proxy-1  Healthy
+ Container shop-api-1  Healthy
+ Container shop-worker-1  Healthy
+$ ../tp05/seed.sh
+NOTICE:  relation "products" already exists, skipping
+CREATE TABLE
+NOTICE:  relation "orders" already exists, skipping
+CREATE TABLE
+INSERT 0 500
+INSERT 0 100000
+ orders |             checksum             
+--------+----------------------------------
+ 100000 | 8e2c3007e8f32687ae06c58e43b9b7e4
+(1 row)
+
+$ docker compose exec -T db psql -U shop -d shop -tA < ../tp05/checksum.sql | tee ../tp05/backups/avant.txt
+commandes=100000 checksum=8e2c3007e8f32687ae06c58e43b9b7e4
+checksum_complet=17fca45bb6e2acf27a62ee343b822b4c
+$ ../tp05/backup.sh
+dump logique : backups/shop-20261029-165214.dump (1.6M)
+copie brute : backups/shop_pgdata-20261029-165214.tar.gz (13M)
+# 1) on détruit tout et on restaure le dump logique
+$ docker compose -f compose.yml down -v
+ Container shop-worker-1  Stopping
+ Container shop-proxy-1  Stopping
+ Container shop-api-1  Stopping
+ Container shop-api-1  Stopped
+ Container shop-api-1  Removing
+ Container shop-api-1  Removed
+ Container shop-proxy-1  Stopped
+ Container shop-proxy-1  Removing
+ Container shop-proxy-1  Removed
+ Container shop-worker-1  Stopped
+ Container shop-worker-1  Removing
+ Container shop-worker-1  Removed
+ Container shop-db-1  Stopping
+ Container shop-redis-1  Stopping
+ Container shop-redis-1  Stopped
+ Container shop-redis-1  Removing
+ Container shop-db-1  Stopped
+ Container shop-db-1  Removing
+ Container shop-redis-1  Removed
+ Container shop-db-1  Removed
+ Volume shop_pgdata  Removing
+ Volume shop_redisdata  Removing
+ Network shop_front  Removing
+ Network shop_back  Removing
+ Volume shop_pgdata  Removed
+ Volume shop_redisdata  Removed
+ Network shop_front  Removed
+ Network shop_back  Removed
+$ docker compose -f compose.yml up -d --wait
+ Network shop_front  Creating
+ Network shop_front  Created
+ Network shop_back  Creating
+ Network shop_back  Created
+ Volume "shop_redisdata"  Creating
+ Volume "shop_redisdata"  Created
+ Volume "shop_pgdata"  Creating
+ Volume "shop_pgdata"  Created
+ Container shop-db-1  Creating
+ Container shop-redis-1  Creating
+ Container shop-proxy-1  Creating
+ Container shop-redis-1  Created
+ Container shop-proxy-1  Created
+ Container shop-db-1  Created
+ Container shop-worker-1  Creating
+ Container shop-api-1  Creating
+ Container shop-worker-1  Created
+ Container shop-api-1  Created
+ Container shop-redis-1  Starting
+ Container shop-proxy-1  Starting
+ Container shop-db-1  Starting
+ Container shop-redis-1  Started
+ Container shop-db-1  Started
+ Container shop-redis-1  Waiting
+ Container shop-db-1  Waiting
+ Container shop-redis-1  Waiting
+ Container shop-db-1  Waiting
+ Container shop-proxy-1  Started
+ Container shop-redis-1  Healthy
+ Container shop-redis-1  Healthy
+ Container shop-db-1  Healthy
+ Container shop-worker-1  Starting
+ Container shop-db-1  Healthy
+ Container shop-api-1  Starting
+ Container shop-worker-1  Started
+ Container shop-api-1  Started
+ Container shop-redis-1  Waiting
+ Container shop-proxy-1  Waiting
+ Container shop-api-1  Waiting
+ Container shop-worker-1  Waiting
+ Container shop-db-1  Waiting
+ Container shop-proxy-1  Healthy
+ Container shop-db-1  Healthy
+ Container shop-redis-1  Healthy
+ Container shop-worker-1  Healthy
+ Container shop-api-1  Healthy
+$ docker compose exec -T db psql -U shop -d shop -tA < ../tp05/checksum.sql
+commandes=0 checksum=vide
+checksum_complet=0290537997782f82b301dbdb79740e97
+$ ../tp05/restore.sh ../tp05/backups/shop-20261029-165214.dump
+restauré depuis /c/Users/carla/Desktop/dev-docker/docker-exo/docker-exo/tp05/backups/shop-20261029-165214.dump
+commandes=100000 checksum=8e2c3007e8f32687ae06c58e43b9b7e4
+checksum_complet=17fca45bb6e2acf27a62ee343b822b4c
+$ docker compose exec -T db psql -U shop -d shop -tA < ../tp05/checksum.sql > ../tp05/backups/apres.txt
+$ diff ../tp05/backups/avant.txt ../tp05/backups/apres.txt && echo "checksums identiques"
+checksums identiques
+# 2) on détruit tout et on restaure la copie brute du volume
+$ docker compose -f compose.yml down -v
+ Container shop-api-1  Stopping
+ Container shop-worker-1  Stopping
+ Container shop-proxy-1  Stopping
+ Container shop-api-1  Stopped
+ Container shop-api-1  Removing
+ Container shop-api-1  Removed
+ Container shop-proxy-1  Stopped
+ Container shop-proxy-1  Removing
+ Container shop-proxy-1  Removed
+ Container shop-worker-1  Stopped
+ Container shop-worker-1  Removing
+ Container shop-worker-1  Removed
+ Container shop-db-1  Stopping
+ Container shop-redis-1  Stopping
+ Container shop-redis-1  Stopped
+ Container shop-redis-1  Removing
+ Container shop-redis-1  Removed
+ Container shop-db-1  Stopped
+ Container shop-db-1  Removing
+ Container shop-db-1  Removed
+ Volume shop_redisdata  Removing
+ Volume shop_pgdata  Removing
+ Network shop_front  Removing
+ Network shop_back  Removing
+ Volume shop_pgdata  Removed
+ Volume shop_redisdata  Removed
+ Network shop_back  Removed
+ Network shop_front  Removed
+$ docker compose -f compose.yml up -d --wait
+ Network shop_back  Creating
+ Network shop_back  Created
+ Network shop_front  Creating
+ Network shop_front  Created
+ Volume "shop_redisdata"  Creating
+ Volume "shop_redisdata"  Created
+ Volume "shop_pgdata"  Creating
+ Volume "shop_pgdata"  Created
+ Container shop-db-1  Creating
+ Container shop-proxy-1  Creating
+ Container shop-redis-1  Creating
+ Container shop-proxy-1  Created
+ Container shop-redis-1  Created
+ Container shop-db-1  Created
+ Container shop-worker-1  Creating
+ Container shop-api-1  Creating
+ Container shop-api-1  Created
+ Container shop-worker-1  Created
+ Container shop-db-1  Starting
+ Container shop-proxy-1  Starting
+ Container shop-redis-1  Starting
+ Container shop-proxy-1  Started
+ Container shop-db-1  Started
+ Container shop-redis-1  Started
+ Container shop-db-1  Waiting
+ Container shop-redis-1  Waiting
+ Container shop-redis-1  Waiting
+ Container shop-db-1  Waiting
+ Container shop-redis-1  Healthy
+ Container shop-db-1  Healthy
+ Container shop-api-1  Starting
+ Container shop-redis-1  Healthy
+ Container shop-db-1  Healthy
+ Container shop-worker-1  Starting
+ Container shop-worker-1  Started
+ Container shop-api-1  Started
+ Container shop-proxy-1  Waiting
+ Container shop-api-1  Waiting
+ Container shop-worker-1  Waiting
+ Container shop-db-1  Waiting
+ Container shop-redis-1  Waiting
+ Container shop-db-1  Healthy
+ Container shop-proxy-1  Healthy
+ Container shop-redis-1  Healthy
+ Container shop-api-1  Healthy
+ Container shop-worker-1  Healthy
+$ docker compose exec -T db psql -U shop -d shop -tA < ../tp05/checksum.sql
+commandes=0 checksum=vide
+checksum_complet=0290537997782f82b301dbdb79740e97
+$ ../tp05/restore.sh ../tp05/backups/shop_pgdata-20261029-165214.tar.gz
+restauré depuis /c/Users/carla/Desktop/dev-docker/docker-exo/docker-exo/tp05/backups/shop_pgdata-20261029-165214.tar.gz
+commandes=100000 checksum=8e2c3007e8f32687ae06c58e43b9b7e4
+checksum_complet=17fca45bb6e2acf27a62ee343b822b4c
+$ docker compose exec -T db psql -U shop -d shop -tA < ../tp05/checksum.sql > ../tp05/backups/apres.txt
+$ diff ../tp05/backups/avant.txt ../tp05/backups/apres.txt && echo "checksums identiques"
+checksums identiques

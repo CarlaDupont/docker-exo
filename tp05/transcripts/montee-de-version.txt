@@ -1,0 +1,94 @@
+# base legacy en PostgreSQL 14 (legacy/compose.yml), volume neuf
+$ docker compose -f compose.yml up -d --wait
+ Network shopdata_default  Creating
+ Network shopdata_default  Created
+ Volume "shopdata_pgdata"  Creating
+ Volume "shopdata_pgdata"  Created
+ Container shopdata-db-1  Creating
+ Container shopdata-db-1  Created
+ Container shopdata-db-1  Starting
+ Container shopdata-db-1  Started
+ Container shopdata-db-1  Waiting
+ Container shopdata-db-1  Healthy
+$ ../seed.sh
+CREATE TABLE
+CREATE TABLE
+INSERT 0 500
+INSERT 0 100000
+ orders |             checksum             
+--------+----------------------------------
+ 100000 | 61ed1a23a31f1bb9d34a3b69e3e8b203
+(1 row)
+
+# changer seulement le tag en 16, sur le même volume
+$ docker compose -f compose.yml stop db
+ Container shopdata-db-1  Stopping
+ Container shopdata-db-1  Stopped
+$ docker run --rm -v shopdata_pgdata:/var/lib/postgresql/data postgres:16.4-alpine; echo "code de sortie : $?"
+
+PostgreSQL Database directory appears to contain a database; Skipping initialization
+
+2026-10-29 15:55:12.936 UTC [1] FATAL:  database files are incompatible with server
+2026-10-29 15:55:12.936 UTC [1] DETAIL:  The data directory was initialized by PostgreSQL version 14, which is not compatible with this version 16.4.
+code de sortie : 1
+$ docker compose -f compose.yml up -d --wait
+ Container shopdata-db-1  Created
+ Container shopdata-db-1  Starting
+ Container shopdata-db-1  Started
+ Container shopdata-db-1  Waiting
+ Container shopdata-db-1  Healthy
+# montée de version
+$ ../upgrade-pg.sh
+== 1. état avant (PostgreSQL 14.13)
+commandes=100000 checksum=61ed1a23a31f1bb9d34a3b69e3e8b203
+checksum_complet=187d7cb8d24013cb3aed2179f4b466e4
+== 2. sauvegardes
+4.9M ../backups/upgrade/dumpall-20261029-165520.sql
+1.6M ../backups/upgrade/shop-20261029-165520.dump
+== 3. arrêt de PostgreSQL 14 (volume conservé)
+ Container shopdata-db-1  Stopping
+ Container shopdata-db-1  Stopped
+== 4. PostgreSQL 16 sur un nouveau volume
+ Volume "shopdata_pgdata16"  Creating
+ Volume "shopdata_pgdata16"  Created
+ Container shopdata-db-1  Recreate
+ Container shopdata-db-1  Recreated
+ Container shopdata-db-1  Starting
+ Container shopdata-db-1  Started
+ Container shopdata-db-1  Waiting
+ Container shopdata-db-1  Healthy
+== 5. restauration
+== 6. état après (PostgreSQL 16.4)
+commandes=100000 checksum=61ed1a23a31f1bb9d34a3b69e3e8b203
+checksum_complet=187d7cb8d24013cb3aed2179f4b466e4
+== VERDICT : OK, données identiques
+# retour arrière : PostgreSQL 14 sur l'ancien volume, jamais modifié
+$ docker compose -f compose.yml up -d --wait
+ Container shopdata-db-1  Recreate
+ Container shopdata-db-1  Recreated
+ Container shopdata-db-1  Starting
+ Container shopdata-db-1  Started
+ Container shopdata-db-1  Waiting
+ Container shopdata-db-1  Healthy
+$ docker compose exec -T db psql -U shop -d shop -tAc 'show server_version'
+14.13
+$ docker compose exec -T db psql -U shop -d shop -tA < ../checksum.sql
+commandes=100000 checksum=61ed1a23a31f1bb9d34a3b69e3e8b203
+checksum_complet=187d7cb8d24013cb3aed2179f4b466e4
+# et de nouveau PostgreSQL 16
+$ docker compose -f compose.yml -f compose.pg16.yml up -d --wait
+ Container shopdata-db-1  Recreate
+ Container shopdata-db-1  Recreated
+ Container shopdata-db-1  Starting
+ Container shopdata-db-1  Started
+ Container shopdata-db-1  Waiting
+ Container shopdata-db-1  Healthy
+$ docker compose exec -T db psql -U shop -d shop -tAc 'show server_version'
+16.4
+$ docker compose exec -T db psql -U shop -d shop -tA < ../checksum.sql
+commandes=100000 checksum=61ed1a23a31f1bb9d34a3b69e3e8b203
+checksum_complet=187d7cb8d24013cb3aed2179f4b466e4
+# relancer le script refuse d'écraser le nouveau volume
+$ ../upgrade-pg.sh; echo "code de sortie : $?"
+le volume shopdata_pgdata16 existe déjà : montée de version déjà faite ?
+code de sortie : 1

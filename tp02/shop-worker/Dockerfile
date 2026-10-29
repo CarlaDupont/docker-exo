@@ -37,7 +37,7 @@ ARG GIT_SHA=unknown
 LABEL org.opencontainers.image.title="shop-worker" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${GIT_SHA}" \
-      org.opencontainers.image.source="https://github.com/shop-sas/shop-worker" \
+      org.opencontainers.image.source="https://github.com/CarlaDupont/docker-exo" \
       org.opencontainers.image.vendor="Shop SAS"
 RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin worker
 COPY --from=builder /opt/venv /opt/venv

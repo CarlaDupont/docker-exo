@@ -26,7 +26,7 @@ WORKDIR /app
 
 ARG APP_VERSION=0.0.0
 ARG GIT_SHA=unknown
-ARG SOURCE_URL=https://github.com/shop-sas/shopapi
+ARG SOURCE_URL=https://github.com/CarlaDupont/docker-exo
 LABEL org.opencontainers.image.title="shopapi" \
       org.opencontainers.image.description="API catalogue produits" \
       org.opencontainers.image.version="${APP_VERSION}" \

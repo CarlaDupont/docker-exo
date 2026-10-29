@@ -1,0 +1,52 @@
+x-hardening: &hardening
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  proxy:
+    <<: *hardening
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+
+  api:
+    <<: *hardening
+    build: !reset null
+    image: ${REGISTRY:?REGISTRY manquant dans .env}/shopapi:${API_VERSION:?API_VERSION manquant dans .env}
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+
+  worker:
+    <<: *hardening
+    build: !reset null
+    image: ${REGISTRY:?REGISTRY manquant dans .env}/shop-worker:${WORKER_VERSION:?WORKER_VERSION manquant dans .env}
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+
+  db:
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M

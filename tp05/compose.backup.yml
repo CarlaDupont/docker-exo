@@ -1,0 +1,28 @@
+# Sauvegarde planifiée de la base du TP04, à ajouter à sa stack :
+#   docker compose -f ../tp04/compose.yml -f compose.backup.yml up -d --wait
+# Les chemins relatifs seraient résolus depuis ../tp04 : les dumps vont donc dans un volume nommé.
+services:
+  backup:
+    image: prodrigestivill/postgres-backup-local:16-alpine-437f2e9
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: shop
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      SCHEDULE: ${BACKUP_SCHEDULE:-@daily}
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+    secrets:
+      - db_password
+    volumes:
+      - pgbackups:/backups
+    networks:
+      - back
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgbackups:

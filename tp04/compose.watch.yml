@@ -1,0 +1,11 @@
+# Windows : node --watch ne voit pas les modifications faites dans un bind mount.
+# docker compose -f compose.yml -f compose.override.yml -f compose.watch.yml watch
+services:
+  api:
+    command: ["node", "src/server.js"]
+    volumes: !reset []
+    develop:
+      watch:
+        - action: sync+restart
+          path: ../tp01/shopapi/src
+          target: /app/src
