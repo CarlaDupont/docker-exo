@@ -1,0 +1,42 @@
+$ docker compose -f lab/compose.yml --profile act run --rm -v <dépôt>:/repo -v event-pr.json:/event.json act pull_request -e /event.json -P ubuntu-24.04=catthehacker/ubuntu:act-24.04
+# lignes d'étapes seulement (le journal complet fait plusieurs milliers de lignes)
+[ci/lint] ⭐ Run Main actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+[ci/lint]   ✅  Success - Main actions/checkout@11d5960a326750d5838078e36cf38b85af677262 [4.581434991s]
+[ci/lint] ⭐ Run Main hadolint
+[ci/lint]   ✅  Success - Main hadolint [3.557341823s]
+[ci/lint] ⭐ Run Main docker compose config
+[ci/lint]   ✅  Success - Main docker compose config [1.049743263s]
+[ci/lint] 🏁  Job succeeded
+[ci/build-1  ] ⭐ Run Main actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+[ci/build-2  ] ⭐ Run Main actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+[ci/build-1  ]   ✅  Success - Main actions/checkout@11d5960a326750d5838078e36cf38b85af677262 [2.32992448s]
+[ci/build-2  ]   ✅  Success - Main actions/checkout@11d5960a326750d5838078e36cf38b85af677262 [2.172965036s]
+[ci/build-1  ] ⭐ Run Main nom du registre en minuscules
+[ci/build-1  ]   ✅  Success - Main nom du registre en minuscules [368.749534ms]
+[ci/build-2  ] ⭐ Run Main nom du registre en minuscules
+[ci/build-2  ]   ✅  Success - Main nom du registre en minuscules [434.550449ms]
+[ci/build-1  ] ⭐ Run Main docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130
+[ci/build-2  ] ⭐ Run Main docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130
+[ci/build-1  ]   ✅  Success - Main docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 [43.323159348s]
+[ci/build-2  ]   ✅  Success - Main docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 [43.043856215s]
+[ci/build-1  ] ⭐ Run Main docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+[ci/build-2  ] ⭐ Run Main docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+[ci/build-2  ]   ✅  Success - Main docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f [28.349577405s]
+[ci/build-1  ]   ✅  Success - Main docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f [28.527341534s]
+[ci/build-2  ] ⭐ Run Main pip.conf
+[ci/build-1  ] ⭐ Run Main pip.conf
+[ci/build-2  ]   ✅  Success - Main pip.conf [882.047529ms]
+[ci/build-1  ]   ✅  Success - Main pip.conf [921.784555ms]
+[ci/build-2  ] ⭐ Run Main tests (étape test du Dockerfile)
+[ci/build-1  ] ⭐ Run Main tests (étape test du Dockerfile)
+[ci/build-1  ]   ✅  Success - Main tests (étape test du Dockerfile) [1m20.332587221s]
+[ci/build-1  ] ⭐ Run Main docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051
+[ci/build-1  ]   ❗  ::error::Bad credentials
+[ci/build-1  ]   ❌  Failure - Main docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 [21.427730761s]
+[ci/build-1  ] 🏁  Job failed
+[ci/build-2  ]   ✅  Success - Main tests (étape test du Dockerfile) [2m0.630939641s]
+[ci/build-2  ] ⭐ Run Main docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051
+[ci/build-2  ]   ❗  ::error::Bad credentials
+[ci/build-2  ]   ❌  Failure - Main docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 [7.728036978s]
+[ci/build-2  ] 🏁  Job failed
+code act=1

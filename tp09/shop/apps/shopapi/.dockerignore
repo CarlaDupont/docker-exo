@@ -1,0 +1,6 @@
+# on n'envoie au build que ce qui sert
+*
+!package.json
+!package-lock.json
+!src/
+!test/

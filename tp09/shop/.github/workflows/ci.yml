@@ -1,0 +1,275 @@
+# Pipeline Shop SAS
+#   pull request : lint, compose config, tests, build multi-arch (sans push)
+#   main         : + push sha-<sha> sur GHCR, scan trivy bloquant, signature cosign keyless, déploiement préprod
+#   tag v*       : tags semver posés sur l'image déjà signée (pas de rebuild), puis prod après approbation
+# Actions épinglées par SHA de commit (un tag peut être déplacé), version en commentaire.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  TRIVY_IMAGE: aquasec/trivy:0.57.1
+  # identité attendue dans les signatures : ce workflow, lancé sur main
+  SIGNER: https://github.com/${{ github.repository }}/.github/workflows/ci.yml@refs/heads/main
+  OIDC_ISSUER: https://token.actions.githubusercontent.com
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: hadolint
+        run: |
+          for f in apps/shopapi/Dockerfile apps/shop-worker/Dockerfile; do
+            echo "== $f"
+            docker run --rm -i hadolint/hadolint:v2.12.0 hadolint - < "$f"
+          done
+      - name: docker compose config
+        run: |
+          docker compose config -q
+          REGISTRY=ghcr.io/exemple VERSION=sha-0000000 docker compose -f compose.yml -f compose.prod.yml config -q
+
+  build:
+    needs: lint
+    if: github.ref_type != 'tag'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write # jeton OIDC pour cosign keyless
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: api
+            image: shop-api
+            context: apps/shopapi
+          - app: worker
+            image: shop-worker
+            context: apps/shop-worker
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: nom du registre en minuscules
+        run: echo "REGISTRY=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      # pip.conf du worker : secret PIP_CONF du dépôt (index privé), sinon l'index public.
+      # Passé en secret de build : il n'arrive dans aucune couche de l'image.
+      - name: pip.conf
+        env:
+          PIP_CONF: ${{ secrets.PIP_CONF }}
+        run: |
+          if [ -n "$PIP_CONF" ]; then
+            printf '%s\n' "$PIP_CONF" > "$RUNNER_TEMP/pip.conf"
+          else
+            printf '[global]\nindex-url = https://pypi.org/simple\n' > "$RUNNER_TEMP/pip.conf"
+          fi
+
+      - name: tests (étape test du Dockerfile)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: ${{ matrix.context }}
+          target: test
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }},ignore-error=true
+          secret-files: |
+            pipconf=${{ runner.temp }}/pip.conf
+
+      - id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ matrix.image }}
+          # politique du TP03 : sha-<sha> immuable, jamais latest
+          flavor: latest=false
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=pr
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image }}
+            org.opencontainers.image.vendor=Shop SAS
+
+      - if: github.event_name == 'push'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: build
+        name: build multi-arch (push seulement sur main)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: ${{ matrix.context }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.version }}
+            VERSION=${{ steps.meta.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }},ignore-error=true
+          secret-files: |
+            pipconf=${{ runner.temp }}/pip.conf
+
+      # l'image est déjà poussée, mais sans signature : le déploiement la refusera si le scan échoue
+      - name: scan trivy (bloquant)
+        if: github.event_name == 'push'
+        env:
+          REF: ${{ env.REGISTRY }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for p in linux/amd64 linux/arm64; do
+            echo "== $p"
+            docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD "$TRIVY_IMAGE" image \
+              --platform "$p" --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$REF"
+          done
+
+      - if: github.event_name == 'push'
+        uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
+      - name: signature cosign keyless
+        if: github.event_name == 'push'
+        env:
+          REF: ${{ env.REGISTRY }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$REF"
+
+  deploy-preprod:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: preprod
+    concurrency: preprod
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: version à déployer
+        run: |
+          echo "REGISTRY=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+          echo "VERSION=sha-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
+      - name: vérification des signatures
+        run: |
+          for img in shop-api shop-worker; do
+            cosign verify --certificate-identity "$SIGNER" --certificate-oidc-issuer "$OIDC_ISSUER" \
+              "$REGISTRY/$img:$VERSION" > /dev/null
+            echo "signature OK : $REGISTRY/$img:$VERSION"
+          done
+      # Pas de serveur joignable depuis GitHub pour ce TP : la préprod est le runner lui-même.
+      # Sur un vrai serveur : DOCKER_HOST=ssh://deploy@preprod (clé dans un secret), avec .env et
+      # secrets/ déjà présents sur le serveur, au même chemin (voir RAPPORT, étape 3).
+      - name: secret de la base (sur un vrai serveur, il y est déjà)
+        run: openssl rand -hex 16 | tr -d '\n' > secrets/db_password.txt
+      - name: déploiement
+        run: ./deploy/rolling-update.sh
+      - name: smoke test
+        run: COMPOSE="docker compose -f compose.yml -f compose.prod.yml" ./smoke-test.sh
+
+  promote:
+    needs: lint
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        image: [shop-api, shop-worker]
+    steps:
+      - name: registre et image construite sur main
+        run: |
+          echo "REGISTRY=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+          echo "SOURCE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${{ matrix.image }}:sha-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
+      # le commit tagué doit avoir été construit, scanné et signé sur main
+      - name: vérification de la signature
+        run: cosign verify --certificate-identity "$SIGNER" --certificate-oidc-issuer "$OIDC_ISSUER" "$SOURCE" > /dev/null
+      - id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ matrix.image }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      # une version publiée est immuable : refus si x.y.z existe déjà sur un autre digest (x.y peut bouger)
+      - name: version déjà publiée ?
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          src=$(docker buildx imagetools inspect "$SOURCE" --format '{{json .Manifest.Digest}}')
+          if cur=$(docker buildx imagetools inspect "$REGISTRY/${{ matrix.image }}:$VERSION" --format '{{json .Manifest.Digest}}' 2>/dev/null) \
+             && [ "$cur" != "$src" ]; then
+            echo "${{ matrix.image }}:$VERSION existe déjà sur un autre digest ($cur) : publier une nouvelle version"
+            exit 1
+          fi
+      # nouveaux tags sur le même digest : la signature reste valable, rien n'est reconstruit
+      - name: tags semver
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          args=()
+          for t in $TAGS; do args+=(-t "$t"); done
+          docker buildx imagetools create "${args[@]}" "$SOURCE"
+          docker buildx imagetools inspect "$SOURCE" --format '{{json .Manifest.Digest}}'
+
+  deploy-prod:
+    needs: promote
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    # approbation manuelle : relecteurs obligatoires configurés sur l'environnement production
+    environment: production
+    concurrency: production
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: version à déployer
+        run: |
+          echo "REGISTRY=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
+      - name: vérification des signatures
+        run: |
+          for img in shop-api shop-worker; do
+            cosign verify --certificate-identity "$SIGNER" --certificate-oidc-issuer "$OIDC_ISSUER" \
+              "$REGISTRY/$img:$VERSION" > /dev/null
+            echo "signature OK : $REGISTRY/$img:$VERSION"
+          done
+      - name: secret de la base (sur un vrai serveur, il y est déjà)
+        run: openssl rand -hex 16 | tr -d '\n' > secrets/db_password.txt
+      - name: déploiement
+        run: ./deploy/rolling-update.sh
+      - name: smoke test
+        run: COMPOSE="docker compose -f compose.yml -f compose.prod.yml" ./smoke-test.sh

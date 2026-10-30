@@ -1,0 +1,72 @@
+# Labo du TP09 : deux serveurs (préprod et prod) joignables en SSH, un poste qui déploie, et act.
+#   ./setup.sh                                   (une fois : clé SSH, contextes, fichiers des serveurs)
+#   docker compose exec runner bash              (puis docker --context preprod ...)
+name: tp09-lab
+
+x-server: &server
+  build: ./preprod
+  # obligatoire pour faire tourner un moteur Docker dans un conteneur (labo uniquement)
+  privileged: true
+  environment:
+    DOCKER_TLS_CERTDIR: ""
+  extra_hosts:
+    # le registre du TP03 tourne sur le poste ; son certificat est fait pour registry.local
+    - registry.local:host-gateway
+
+services:
+  preprod:
+    <<: *server
+    hostname: preprod
+    volumes:
+      - ./ssh/id_ed25519.pub:/run/lab/authorized_keys:ro
+      # syntaxe longue : le ":5000" du chemin casse la syntaxe courte (too many colons)
+      - type: bind
+        source: ../../tp03/registry/certs/ca.crt
+        target: /etc/docker/certs.d/registry.local:5000/ca.crt
+        read_only: true
+      # images et volumes du serveur gardés entre deux redémarrages du labo
+      - preprod-docker:/var/lib/docker
+      - preprod-srv:/srv/shop
+    ports:
+      # Traefik de la stack déployée sur le serveur
+      - "8090:80"
+
+  prod:
+    <<: *server
+    hostname: prod
+    volumes:
+      - ./ssh/id_ed25519.pub:/run/lab/authorized_keys:ro
+      - type: bind
+        source: ../../tp03/registry/certs/ca.crt
+        target: /etc/docker/certs.d/registry.local:5000/ca.crt
+        read_only: true
+      - prod-docker:/var/lib/docker
+      - prod-srv:/srv/shop
+    ports:
+      - "8092:80"
+
+  runner:
+    build: ./runner
+    working_dir: /srv/shop
+    # ssh refuse une clé lisible par tous : on la recopie avec les bons droits
+    command: ["sh", "-c", "mkdir -p /root/.ssh && cp /lab/ssh/id_ed25519 /lab/ssh/config /root/.ssh/ && chmod 600 /root/.ssh/* && exec sleep infinity"]
+    volumes:
+      - ./ssh:/lab/ssh:ro
+      # le dépôt, au même chemin que sur les serveurs (voir RAPPORT : chemins des bind mounts)
+      - ../shop:/srv/shop:ro
+    depends_on:
+      - preprod
+      - prod
+
+  # act : exécute le workflow GitHub Actions en local (docker compose run --rm act ...)
+  act:
+    build: ./act
+    profiles: ["act"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  preprod-docker:
+  preprod-srv:
+  prod-docker:
+  prod-srv:

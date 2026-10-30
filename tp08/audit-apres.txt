@@ -1,0 +1,9 @@
+CONTENEUR             UTILISATEUR  PRIV  CAP_ADD                  CAP_DROP RO_FS MEMOIRE PIDS   NNP  SOCKET ECARTS
+shop-api-1            node         false -                        ALL      true  256M    100    oui  non    OK
+shop-db-1             postgres     false -                        ALL      true  512M    200    oui  non    OK
+shop-proxy-1          65534:65534  false -                        ALL      true  256M    100    oui  non    OK
+shop-redis-1          redis        false -                        ALL      true  256M    100    oui  non    OK
+shop-socket-proxy-1   65534:0      false -                        ALL      true  64M     100    oui  oui    socket 
+shop-worker-1         worker       false -                        ALL      true  256M    100    oui  non    OK
+
+écarts : 1

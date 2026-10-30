@@ -1,0 +1,5 @@
+.env
+secrets/*
+!secrets/.gitkeep
+apps/shop-worker/pip.conf
+node_modules/

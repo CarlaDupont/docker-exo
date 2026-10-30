@@ -1,0 +1,22 @@
+$ ./ci-local.sh pr
+
+=== lint : hadolint (15:57:19)
+apps/shopapi/Dockerfile : OK
+apps/shop-worker/Dockerfile : OK
+
+=== lint : docker compose config (15:57:24)
+compose.yml et compose.prod.yml : OK
+
+=== api : étape test du Dockerfile (15:57:26)
+OK
+
+=== api : build linux/amd64,linux/arm64 (15:57:32)
+OK
+
+=== worker : étape test du Dockerfile (15:57:40)
+OK
+
+=== worker : build linux/amd64,linux/arm64 (15:57:44)
+OK
+
+PIPELINE OK (pr, sha-2d9bdf5) en 40 s

@@ -65,6 +65,7 @@ Deux problèmes rencontrés :
 - images `${REGISTRY}/shopapi:${API_VERSION}` et `${REGISTRY}/shop-worker:${WORKER_VERSION}`. J'ai mis deux versions parce que l'API et le worker n'ont pas le même numéro. Sans `.env`, la commande s'arrête avec `REGISTRY manquant dans .env`.
 - API en 2 réplicas, limites CPU et mémoire, `read_only` + `tmpfs`, `cap_drop: [ALL]`, `no-new-privileges` (API, worker, Traefik)
 - pas de port de debug ni de tableau de bord (le port 8080 ne répond pas)
+- Traefik était limité à 128 Mo au départ. Un jour, il est passé `unhealthy` : il utilisait 144 Mo, et son healthcheck (`traefik healthcheck --ping`, qui lance un deuxième processus traefik) mettait 5 à 8 s au lieu de moins de 1 s, au-delà du timeout de 3 s. Je suis passé à 256 Mo.
 
 Registre : celui du TP03. Je n'ai pas configuré `registry.local` sur le poste, donc j'utilise `localhost:5000`, que Docker accepte sans installer la CA. Il faut un `docker login localhost:5000 -u ci` avant `make prod-up`.
 

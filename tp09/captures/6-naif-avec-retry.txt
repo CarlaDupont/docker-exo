@@ -1,0 +1,10 @@
+# déploiement naïf, avec retry et dialTimeout
+# commande : docker compose -f compose.yml -f compose.prod.yml up -d --force-recreate api
+4000 requêtes sur http://preprod/health (Host: api.localhost) à 100 req/s
+réponses : 4000, échecs : 466
+  HTTP 000 (pas de réponse) : 1
+  HTTP 200 : 3534
+  HTTP 404 : 465
+échecs entre la requête 550 et la 1015
+temps de réponse max : 2.004 s
+durée réelle : 46 s

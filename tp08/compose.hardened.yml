@@ -1,0 +1,123 @@
+# Surcharge de durcissement de la stack du TP04 :
+#   docker compose -f ../tp04/compose.yml -f compose.hardened.yml up -d --wait
+# Le dossier du projet reste ../tp04 (premier fichier) : .env et secrets sont lus là-bas.
+
+x-hardening: &hardening
+  # l'attaquant ne peut ni modifier les binaires ni déposer un outil dans le conteneur
+  read_only: true
+  # aucune capability : root dans le conteneur ne peut plus changer les propriétaires,
+  # tuer d'autres processus, ouvrir des sockets brutes, monter des fichiers...
+  cap_drop: [ALL]
+  # un binaire setuid (sudo, su...) ne peut plus redonner les droits root.
+  # !override : remplace la liste au lieu de l'ajouter à celle de compose.prod.yml (doublon refusé)
+  security_opt: !override
+    - no-new-privileges:true
+# Limites dans deploy.resources.limits de chaque service. pids : une fork bomb reste enfermée
+# dans le conteneur (Compose refuse pids_limit à côté de deploy.resources.limits).
+
+services:
+  # Seul conteneur qui voit la socket Docker. Il ne laisse passer que des lectures
+  # (POST=0 par défaut) et seulement les routes utiles à Traefik.
+  socket-proxy:
+    <<: *hardening
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    # pas root : nobody, dans le groupe 0 pour pouvoir ouvrir la socket (root:root, 660)
+    user: "65534:0"
+    tmpfs:
+      - /tmp                # haproxy.cfg généré au démarrage
+      - /run:uid=65534      # fichier pid de haproxy
+    environment:
+      CONTAINERS: 1         # lister / inspecter les conteneurs (VERSION, PING et EVENTS sont autorisés par défaut)
+    volumes:
+      # :ro n'empêche pas d'envoyer des requêtes à l'API : c'est le proxy qui filtre
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - socket
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2375/_ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 64M
+          pids: 100
+
+  proxy:
+    <<: *hardening
+    # nobody : Docker autorise déjà l'écoute sur le port 80 sans NET_BIND_SERVICE
+    # (net.ipv4.ip_unprivileged_port_start=0 dans chaque conteneur)
+    user: "65534:65534"
+    environment:
+      TRAEFIK_PROVIDERS_DOCKER_ENDPOINT: tcp://socket-proxy:2375
+    # plus de socket Docker dans Traefik : s'il est compromis, il ne peut que lire la liste des conteneurs
+    volumes: !reset []
+    networks:
+      - socket
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+          pids: 100
+
+  api:
+    <<: *hardening
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+          pids: 100
+
+  worker:
+    <<: *hardening
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+          pids: 100
+
+  db:
+    <<: *hardening
+    # lancé directement en postgres : le script d'entrée n'a plus besoin de chown ni de gosu,
+    # donc d'aucune capability (en root il lui faut CHOWN, SETUID, SETGID et DAC_OVERRIDE)
+    user: postgres
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql:uid=70,gid=70   # socket unix et verrou, au propriétaire postgres (sinon le chmod du script d'entrée échoue)
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+          pids: 200   # un processus par connexion : plus de marge
+
+  redis:
+    <<: *hardening
+    # le script d'entrée de l'image ne passe en redis que s'il démarre en root : on évite le root dès le départ
+    user: redis
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+          pids: 100
+
+networks:
+  # réseau du proxy de socket : pas de sortie, seul Traefik le rejoint
+  socket:
+    internal: true

@@ -1,0 +1,49 @@
+$ echo oui | ./ci-local.sh tag v1.0.0      # 1.0.0 déjà publiée sur un autre commit
+
+=== lint : hadolint (16:13:33)
+apps/shopapi/Dockerfile : OK
+apps/shop-worker/Dockerfile : OK
+
+=== lint : docker compose config (16:13:41)
+compose.yml et compose.prod.yml : OK
+
+=== promotion : signature de l'image de main (16:13:42)
+signature OK : registry.local:5000/shop-api:sha-fb98fd7
+signature OK : registry.local:5000/shop-worker:sha-fb98fd7
+
+=== promotion : tags 1.0.0 et 1.0 sur le même digest (16:13:50)
+shop-api:1.0.0 existe déjà sur un autre digest (sha256:a74e7d15289e2216f8ccf3a42fc8249c8630f3f42b87a48094714014f8840ab3) : publier une nouvelle version
+
+$ echo non | ./ci-local.sh tag v1.2.0      # approbation refusée
+
+=== lint : hadolint (16:13:58)
+apps/shopapi/Dockerfile : OK
+apps/shop-worker/Dockerfile : OK
+
+=== lint : docker compose config (16:14:04)
+compose.yml et compose.prod.yml : OK
+
+=== promotion : signature de l'image de main (16:14:05)
+signature OK : registry.local:5000/shop-api:sha-fb98fd7
+signature OK : registry.local:5000/shop-worker:sha-fb98fd7
+
+=== promotion : tags 1.2.0 et 1.2 sur le même digest (16:14:13)
+shop-api : sha-fb98fd7 sha256:93dfc0a321549bf8195cc51aa36f01fafafd993fad8b6cce719fd8ef8f2e6979 = 1.2.0 sha256:93dfc0a321549bf8195cc51aa36f01fafafd993fad8b6cce719fd8ef8f2e6979
+shop-worker : sha-fb98fd7 sha256:93cdbe810622d51a7787ddcf4307eeb7a7868277124335ca96ec9b5c4c322323 = 1.2.0 sha256:93cdbe810622d51a7787ddcf4307eeb7a7868277124335ca96ec9b5c4c322323
+
+=== prod : approbation manuelle (16:14:51)
+déploiement refusé (réponse : 'non')
+
+$ echo oui | ./ci-local.sh tag v1.3.0      # commit c50db11, jamais construit ni signé sur main
+
+=== lint : hadolint (16:16:13)
+apps/shopapi/Dockerfile : OK
+apps/shop-worker/Dockerfile : OK
+
+=== lint : docker compose config (16:16:18)
+compose.yml et compose.prod.yml : OK
+
+=== promotion : signature de l'image de main (16:16:19)
+signature absente ou invalide : registry.local:5000/shop-api:sha-c50db11
+
+PIPELINE EN ÉCHEC : promotion : signature de l'image de main

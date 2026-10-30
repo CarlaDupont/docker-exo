@@ -1,0 +1,34 @@
+$ echo oui | ./ci-local.sh tag v1.1.0
+
+=== lint : hadolint (16:10:22)
+apps/shopapi/Dockerfile : OK
+apps/shop-worker/Dockerfile : OK
+
+=== lint : docker compose config (16:10:26)
+compose.yml et compose.prod.yml : OK
+
+=== promotion : signature de l'image de main (16:10:27)
+signature OK : registry.local:5000/shop-api:sha-fb98fd7
+signature OK : registry.local:5000/shop-worker:sha-fb98fd7
+
+=== promotion : tags 1.1.0 et 1.1 sur le même digest (16:10:33)
+shop-api : sha-fb98fd7 sha256:93dfc0a321549bf8195cc51aa36f01fafafd993fad8b6cce719fd8ef8f2e6979 = 1.1.0 sha256:93dfc0a321549bf8195cc51aa36f01fafafd993fad8b6cce719fd8ef8f2e6979
+shop-worker : sha-fb98fd7 sha256:93cdbe810622d51a7787ddcf4307eeb7a7868277124335ca96ec9b5c4c322323 = 1.1.0 sha256:93cdbe810622d51a7787ddcf4307eeb7a7868277124335ca96ec9b5c4c322323
+
+=== prod : approbation manuelle (16:11:03)
+approuvé
+
+=== prod : vérification des signatures (16:11:03)
+signature OK : registry.local:5000/shop-api:1.1.0
+signature OK : registry.local:5000/shop-worker:1.1.0
+
+=== prod : déploiement 1.1.0 (16:11:09)
+== 1.1.0 : téléchargement des images
+== premier déploiement
+== déployé en 75 s
+OK     /ready
+OK     /products servi depuis Redis (X-Cache: HIT)
+OK     commande créée
+OK     commande confirmée par le worker
+
+PIPELINE OK (tag, sha-fb98fd7) en 127 s

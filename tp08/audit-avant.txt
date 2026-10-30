@@ -1,0 +1,8 @@
+CONTENEUR             UTILISATEUR  PRIV  CAP_ADD                  CAP_DROP RO_FS MEMOIRE PIDS   NNP  SOCKET ECARTS
+shop-api-1            node         false -                        -        false -       -      non  non    capdrop rw mem pids nnp 
+shop-db-1             root         false -                        -        false -       -      non  non    root capdrop rw mem pids nnp 
+shop-proxy-1          root         false -                        -        false -       -      non  oui    root capdrop rw mem pids nnp socket 
+shop-redis-1          root         false -                        -        false -       -      non  non    root capdrop rw mem pids nnp 
+shop-worker-1         worker       false -                        -        false -       -      non  non    capdrop rw mem pids nnp 
+
+écarts : 29

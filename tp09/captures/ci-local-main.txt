@@ -1,0 +1,54 @@
+$ ./ci-local.sh main
+
+=== lint : hadolint (16:06:50)
+apps/shopapi/Dockerfile : OK
+apps/shop-worker/Dockerfile : OK
+
+=== lint : docker compose config (16:06:54)
+compose.yml et compose.prod.yml : OK
+
+=== api : étape test du Dockerfile (16:06:56)
+OK
+
+=== api : build linux/amd64,linux/arm64 et push localhost:5000/shop-api:sha-fb98fd7 (16:07:01)
+OK
+poussée : registry.local:5000/shop-api@sha256:93dfc0a321549bf8195cc51aa36f01fafafd993fad8b6cce719fd8ef8f2e6979
+
+=== api : scan trivy (bloquant) (16:07:15)
+linux/amd64 : aucune CVE HIGH/CRITICAL corrigeable
+linux/arm64 : aucune CVE HIGH/CRITICAL corrigeable
+
+=== api : signature cosign (16:07:21)
+signée : registry.local:5000/shop-api@sha256:93dfc0a321549bf8195cc51aa36f01fafafd993fad8b6cce719fd8ef8f2e6979
+
+=== worker : étape test du Dockerfile (16:07:26)
+OK
+
+=== worker : build linux/amd64,linux/arm64 et push localhost:5000/shop-worker:sha-fb98fd7 (16:07:30)
+OK
+poussée : registry.local:5000/shop-worker@sha256:93cdbe810622d51a7787ddcf4307eeb7a7868277124335ca96ec9b5c4c322323
+
+=== worker : scan trivy (bloquant) (16:07:53)
+linux/amd64 : aucune CVE HIGH/CRITICAL corrigeable
+linux/arm64 : aucune CVE HIGH/CRITICAL corrigeable
+
+=== worker : signature cosign (16:08:07)
+signée : registry.local:5000/shop-worker@sha256:93cdbe810622d51a7787ddcf4307eeb7a7868277124335ca96ec9b5c4c322323
+
+=== préprod : vérification des signatures (16:08:11)
+signature OK : registry.local:5000/shop-api:sha-fb98fd7
+signature OK : registry.local:5000/shop-worker:sha-fb98fd7
+
+=== préprod : déploiement sha-fb98fd7 (16:08:16)
+== sha-fb98fd7 : téléchargement des images
+== nouveau réplica /shop-api-13 : attente healthy
+== arrêt propre de /shop-api-11 (SIGTERM, 15 s max)
+== nouveau réplica /shop-api-14 : attente healthy
+== arrêt propre de /shop-api-12 (SIGTERM, 15 s max)
+== déployé en 51 s
+OK     /ready
+OK     /products servi depuis Redis (X-Cache: HIT)
+OK     commande créée
+OK     commande confirmée par le worker
+
+PIPELINE OK (main, sha-fb98fd7) en 141 s

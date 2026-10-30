@@ -1,0 +1,117 @@
+{
+  "uid": "shop-sas",
+  "title": "Shop SAS",
+  "tags": ["shop"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Réplicas API up",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(up{job=\"api\"}) or vector(0)" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [
+        { "color": "red", "value": null }, { "color": "orange", "value": 1 }, { "color": "green", "value": 2 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 2, "type": "stat", "title": "Requêtes / s",
+      "gridPos": { "x": 4, "y": 0, "w": 5, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(rate(http_request_duration_seconds_count{job=\"api\"}[1m]))" }],
+      "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 1 }, "overrides": [] }
+    },
+    {
+      "id": 3, "type": "stat", "title": "Réponses 5xx (5 min)",
+      "gridPos": { "x": 9, "y": 0, "w": 5, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "(sum(rate(http_request_duration_seconds_count{job=\"api\", status=~\"5..\"}[5m])) or vector(0)) / sum(rate(http_request_duration_seconds_count{job=\"api\"}[5m]))" }],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 1, "thresholds": { "mode": "absolute", "steps": [
+        { "color": "green", "value": null }, { "color": "red", "value": 0.05 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 4, "type": "stat", "title": "Latence p95 (5 min)",
+      "gridPos": { "x": 14, "y": 0, "w": 5, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"api\"}[5m])))" }],
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "thresholds": { "mode": "absolute", "steps": [
+        { "color": "green", "value": null }, { "color": "red", "value": 0.5 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 5, "type": "stat", "title": "Alertes en cours",
+      "gridPos": { "x": 19, "y": 0, "w": 5, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [
+        { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Requêtes / s par code HTTP",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (status) (rate(http_request_duration_seconds_count{job=\"api\"}[1m]))", "legendFormat": "{{status}}" }],
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Latence de l'API",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"api\"}[1m])))", "legendFormat": "p50" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"api\"}[1m])))", "legendFormat": "p95" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Commandes traitées par le worker (par minute)",
+      "gridPos": { "x": 0, "y": 12, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (status) (increase(orders_processed_total[1m]))", "legendFormat": "{{status}}" }],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "CPU par conteneur",
+      "gridPos": { "x": 8, "y": 12, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "label_replace(label_replace(sum by (image, name) (rate(container_cpu_usage_seconds_total{image=~\".*(shopapi|shop-worker|postgres|redis|traefik).*\"}[1m])), \"conteneur\", \"$1\", \"name\", \"(.{12}).*\"), \"img\", \"$1\", \"image\", \"(?:.*/)?([^/]+)\")", "legendFormat": "{{img}} {{conteneur}}" }],
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] }
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "Mémoire / limite par conteneur",
+      "gridPos": { "x": 16, "y": 12, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "label_replace(label_replace(container_memory_working_set_bytes{image=~\".*(shopapi|shop-worker|postgres|redis|traefik).*\"} / (container_spec_memory_limit_bytes > 0), \"conteneur\", \"$1\", \"name\", \"(.{12}).*\"), \"img\", \"$1\", \"image\", \"(?:.*/)?([^/]+)\")", "legendFormat": "{{img}} {{conteneur}}" }],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "min": 0 }, "overrides": [] }
+    },
+    {
+      "id": 11, "type": "table", "title": "Alertes Prometheus en cours",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "ALERTS{alertstate=\"firing\"}", "instant": true, "format": "table" }],
+      "transformations": [{ "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "alertstate": true, "job": true } } }]
+    },
+    {
+      "id": 12, "type": "timeseries", "title": "Redémarrages de conteneurs (10 min)",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "label_replace(label_replace(changes(container_start_time_seconds{image=~\".*(shopapi|shop-worker|postgres|redis|traefik).*\"}[10m]), \"conteneur\", \"$1\", \"name\", \"(.{12}).*\"), \"img\", \"$1\", \"image\", \"(?:.*/)?([^/]+)\")", "legendFormat": "{{img}} {{conteneur}}" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "min": 0, "softMax": 3 }, "overrides": [] }
+    },
+    {
+      "id": 13, "type": "logs", "title": "Erreurs (API : niveau 50 ou réponse 5xx, worker : ERROR)",
+      "gridPos": { "x": 0, "y": 28, "w": 12, "h": 10 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{ "refId": "A", "expr": "{project=\"shop\"} | json | level=~\"50|ERROR\" or msg=\"request errored\"" }],
+      "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending" }
+    },
+    {
+      "id": 14, "type": "logs", "title": "Commandes rejetées (worker)",
+      "gridPos": { "x": 12, "y": 28, "w": 12, "h": 10 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{ "refId": "A", "expr": "{service=\"worker\"} |= \"rejected\"" }],
+      "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending" }
+    }
+  ]
+}

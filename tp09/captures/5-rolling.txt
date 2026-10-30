@@ -1,0 +1,7 @@
+# rolling-update.sh A -> B avec retry et dialTimeout, déployé en 46 s
+# commande : VERSION=sha-62d09ca ./deploy/rolling-update.sh
+7000 requêtes sur http://preprod/health (Host: api.localhost) à 100 req/s
+réponses : 7000, échecs : 0
+  HTTP 200 : 7000
+temps de réponse max : 1.113 s
+durée réelle : 80 s

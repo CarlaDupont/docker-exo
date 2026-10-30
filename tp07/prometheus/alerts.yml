@@ -1,0 +1,51 @@
+groups:
+  - name: shop
+    rules:
+      # un réplica ne répond plus, ou plus aucun réplica n'est trouvé par le DNS
+      - alert: ApiDown
+        expr: up{job="api"} == 0 or absent(up{job="api"})
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API injoignable ({{ $labels.instance }})"
+
+      - alert: ApiErreurs5xx
+        expr: |
+          sum(rate(http_request_duration_seconds_count{job="api", status=~"5.."}[5m]))
+            / sum(rate(http_request_duration_seconds_count{job="api"}[5m])) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Plus de 5 % de réponses 5xx sur l'API ({{ $value | humanizePercentage }})"
+
+      - alert: ApiLatenceP95
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="api"}[5m]))) > 0.5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 de l'API au-dessus de 500 ms ({{ $value | humanizeDuration }})"
+
+      # cAdvisor : l'heure de démarrage d'un conteneur change à chaque redémarrage
+      - alert: ConteneurRedemarre
+        expr: changes(container_start_time_seconds{image!=""}[10m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Conteneur redémarré ({{ $labels.image }}, {{ $labels.name }})"
+
+      # les conteneurs sans limite ont une limite à 0 : on les exclut.
+      # max_over_time : quand le conteneur est tué par l'OOM killer, la mémoire retombe aussitôt
+      # et ne reste jamais 1 min au-dessus de 90 % ; on regarde donc le pic des 5 dernières minutes.
+      - alert: MemoireProcheLimite
+        expr: |
+          max_over_time((container_memory_working_set_bytes{image!=""}
+            / (container_spec_memory_limit_bytes{image!=""} > 0))[5m:15s]) > 0.9
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mémoire au-dessus de 90 % de la limite ({{ $labels.image }}, {{ $value | humanizePercentage }})"
